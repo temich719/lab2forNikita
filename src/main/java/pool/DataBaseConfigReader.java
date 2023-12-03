@@ -1,2 +1,5 @@
-package pool;public interface DataBaseConfigReader {
+package pool;
+
+public interface DataBaseConfigReader {
+    String get(String name);
 }

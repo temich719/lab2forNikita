@@ -1,9 +1,10 @@
+package model;
+
 import dao.ClientDAO;
 import dao.DAOFactory;
 import dao.OrderDAO;
 import dao.ProductDAO;
 import exception.DAOException;
-import model.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
