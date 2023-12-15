@@ -12,7 +12,7 @@ public class Admin {
     private final BillDAO billDAO = DAOFactory.getINSTANCE().getBillDAO();
 
     public void approveOrder(Order order) {
-        order.setApproved(true);
+        order.setIsApproved(true);
     }
 
     public Bill getBill(Order order) throws DAOException {

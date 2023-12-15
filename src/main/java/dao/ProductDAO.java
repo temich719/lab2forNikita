@@ -10,7 +10,7 @@ public interface ProductDAO {
 
     List<Product> getProducts() throws DAOException;
 
-    Product getProductById(int id) throws DAOException;
+    Product getProductById(Long id) throws DAOException;
 
     List<Product> getProductsByOrder(Order order) throws DAOException;
 

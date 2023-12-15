@@ -3,27 +3,24 @@ package dao.impl;
 import dao.AbstractDAO;
 import dao.ProductDAO;
 import exception.DAOException;
+import model.*;
 import model.Order;
-import model.Product;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
+import org.hibernate.query.Query;
 import pool.ConnectionPool;
+import sessionJPA.SessionFactoryCreator;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
+import javax.persistence.criteria.*;
 import java.util.List;
 
 public class ProductDAOImpl extends AbstractDAO implements ProductDAO {
 
     private final Logger LOGGER = LogManager.getLogger(ProductDAOImpl.class);
-
-    private static final String SELECT_PRODUCTS = "SELECT * FROM Products;";
-    private static final String SELECT_PRODUCT_BY_ID = "SELECT * FROM Products WHERE id = ?;";
-    private static final String SELECT_PRODUCTS_BY_ORDER_ID = "SELECT productId FROM orders_products WHERE orderId = ?;";
-    private static final String SELECT_PRODUCTS_BY_KEYWORD = "SELECT * FROM Products WHERE name LIKE ?;";
+    private final SessionFactory sessionFactory = SessionFactoryCreator.getSessionFactory();
 
     public ProductDAOImpl(ConnectionPool connectionPool) {
         super(connectionPool);
@@ -32,103 +29,90 @@ public class ProductDAOImpl extends AbstractDAO implements ProductDAO {
     @Override
     public List<Product> getProducts() throws DAOException {
         LOGGER.info("Select all products");
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
-        List<Product> products = new ArrayList<>();
-        try {
-            connection = connectionPool.provide();
-            preparedStatement = connection.prepareStatement(SELECT_PRODUCTS);
-            ResultSet resultSet = preparedStatement.executeQuery();
-            while (resultSet.next()) {
-                Product product = new Product(resultSet.getString(2), resultSet.getDouble(3), resultSet.getString(4));
-                products.add(product);
+        Transaction transaction = null;
+        try (Session session = sessionFactory.openSession()) {
+            transaction = session.beginTransaction();
+            CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
+            CriteriaQuery<Product> criteriaQuery = criteriaBuilder.createQuery(Product.class);
+            Root<Product> root = criteriaQuery.from(Product.class);
+            criteriaQuery.select(root);
+            transaction.commit();
+            return session.createQuery(criteriaQuery).list();
+        } catch (Exception e) {
+            LOGGER.error(e.getMessage());
+            if (transaction != null && transaction.isActive()) {
+                transaction.rollback();
             }
-        } catch (SQLException e) {
-            throw new DAOException("DAO exception", e);
-        } finally {
-            close(preparedStatement);
-            connectionPool.retrieve(connection);
+            throw new DAOException("Error in DAO method", e);
         }
-        return products;
     }
 
     @Override
-    public Product getProductById(int id) throws DAOException {
+    public Product getProductById(Long id) throws DAOException {
         LOGGER.info("Select product by id");
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
-        ResultSet resultSet = null;
-        Product product;
-        try {
-            connection = connectionPool.provide();
-            preparedStatement = connection.prepareStatement(SELECT_PRODUCT_BY_ID);
-            preparedStatement.setInt(1, id);
-            resultSet = preparedStatement.executeQuery();
-            resultSet.next();
-            product = new Product(resultSet.getString(2), resultSet.getDouble(3), resultSet.getString(4));
-        } catch (SQLException e) {
-            throw new DAOException(e);
-        } finally {
-            close(resultSet, preparedStatement);
-            connectionPool.retrieve(connection);
+        Transaction transaction = null;
+        try (Session session = sessionFactory.openSession()) {
+            transaction = session.beginTransaction();
+            CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
+            CriteriaQuery<Product> criteriaQuery = criteriaBuilder.createQuery(Product.class);
+            Root<Product> root = criteriaQuery.from(Product.class);
+            criteriaQuery.select(root).where(criteriaBuilder.equal(root.get(Product_.ID), id));
+            transaction.commit();
+            return session.createQuery(criteriaQuery).uniqueResult();
+        } catch (Exception e) {
+            LOGGER.error(e.getMessage());
+            if (transaction != null && transaction.isActive()) {
+                transaction.rollback();
+            }
+            throw new DAOException("Error in DAO method", e);
         }
-        return product;
     }
 
     @Override
     public List<Product> getProductsByOrder(Order order) throws DAOException {
         LOGGER.info("Get product by order");
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
-        ResultSet resultSet = null;
-        List<Product> products = new ArrayList<>();
-        try {
-            connection = connectionPool.provide();
-            connection.setAutoCommit(false);
-            preparedStatement = connection.prepareStatement(SELECT_PRODUCTS_BY_ORDER_ID);
-            preparedStatement.setInt(1, order.getOrderNumber());
-            resultSet = preparedStatement.executeQuery();
-            List<Integer> productsIds = new ArrayList<>();
-            while (resultSet.next()) {
-                Integer id = resultSet.getInt(1);
-                productsIds.add(id);
+        Transaction transaction = null;
+        try (Session session = sessionFactory.openSession()) {
+            transaction = session.beginTransaction();
+            CriteriaBuilder builder = session.getCriteriaBuilder();
+            CriteriaQuery<Product> query = builder.createQuery(Product.class);
+            Root<Product> root = query.from(Product.class);
+            Join<Product, Order> join = root.join("orders");
+
+            Predicate condition = builder.equal(join.get("orderNumber"), order.getOrderNumber());
+            query.select(root).where(condition);
+
+            Query<Product> q = session.createQuery(query);
+            transaction.commit();
+            return q.getResultList();
+        } catch (Exception e) {
+            LOGGER.error(e.getMessage());
+            if (transaction != null && transaction.isActive()) {
+                transaction.rollback();
             }
-            for (Integer productId : productsIds) {
-                Product product = getProductById(productId);
-                products.add(product);
-            }
-            connection.commit();
-            return products;
-        } catch (SQLException e) {
-            throw new DAOException(e);
-        } finally {
-            close(resultSet, preparedStatement);
-            connectionPool.retrieve(connection);
+            throw new DAOException("Error in DAO method", e);
         }
     }
 
     @Override
     public List<Product> findProductsByKeyword(String keyword) throws DAOException {
         LOGGER.info("Select products by keyword");
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
-        List<Product> products = new ArrayList<>();
-        try {
-            connection = connectionPool.provide();
-            preparedStatement = connection.prepareStatement(SELECT_PRODUCTS_BY_KEYWORD);
-            keyword = "%" + keyword + "%";
-            preparedStatement.setString(1, keyword);
-            ResultSet resultSet = preparedStatement.executeQuery();
-            while (resultSet.next()) {
-                Product product = new Product(resultSet.getString(2), resultSet.getDouble(3), resultSet.getString(4));
-                products.add(product);
+        Transaction transaction = null;
+        try (Session session = sessionFactory.openSession()) {
+            transaction = session.beginTransaction();
+            CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
+            CriteriaQuery<Product> criteriaQuery = criteriaBuilder.createQuery(Product.class);
+            Root<Product> root = criteriaQuery.from(Product.class);
+            criteriaQuery.select(root).where(criteriaBuilder.like(root.get(Product_.NAME), "%" + keyword + "%"));
+            Query<Product> q = session.createQuery(criteriaQuery);
+            transaction.commit();
+            return q.getResultList();
+        } catch (Exception e) {
+            LOGGER.error(e.getMessage());
+            if (transaction != null && transaction.isActive()) {
+                transaction.rollback();
             }
-        } catch (SQLException e) {
-            throw new DAOException("DAO exception", e);
-        } finally {
-            close(preparedStatement);
-            connectionPool.retrieve(connection);
+            throw new DAOException("Error in DAO method", e);
         }
-        return products;
     }
 }

@@ -7,11 +7,11 @@ import java.util.List;
 
 public interface OrderDAO {
 
-    Integer makeOrder(Order order) throws DAOException;
+    Long makeOrder(Order order) throws DAOException;
 
-    Order getOrderById(Integer id) throws DAOException;
+    Order getOrderById(Long id) throws DAOException;
 
-    List<Order> getOrdersByClientId(Integer id) throws DAOException;
+    List<Order> getOrdersByClientId(Long id) throws DAOException;
 
     List<Order> getApprovedOrders() throws DAOException;
 

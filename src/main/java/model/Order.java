@@ -1,49 +1,41 @@
 package model;
 
+import lombok.Getter;
+import lombok.Setter;
+
+import javax.persistence.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+@Entity
+@Table(name = "orders")
+@Getter
+@Setter
 public class Order {
 
-    private Integer orderNumber;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long orderNumber;
+
+    @ManyToMany(cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.PERSIST, CascadeType.REFRESH})
+    @JoinTable(
+            name = "orders_products",
+            joinColumns = @JoinColumn(name = "orderId"),
+            inverseJoinColumns = @JoinColumn(name = "productId")
+    )
     private List<Product> products;
     private Boolean isApproved;
+
+    @ManyToMany(mappedBy = "orders")
+    private List<Bill> bills = new ArrayList<>();
+
+    @ManyToOne
+    @JoinColumn(name = "clientId")
     private Client client;
 
     public Order() {
         this.isApproved = false;
-    }
-
-    public Client getClient() {
-        return client;
-    }
-
-    public void setClient(Client client) {
-        this.client = client;
-    }
-
-    public Integer getOrderNumber() {
-        return orderNumber;
-    }
-
-    public void setOrderNumber(Integer orderNumber) {
-        this.orderNumber = orderNumber;
-    }
-
-    public List<Product> getProducts() {
-        return products;
-    }
-
-    public void setProducts(List<Product> products) {
-        this.products = products;
-    }
-
-    public Boolean getApproved() {
-        return isApproved;
-    }
-
-    public void setApproved(Boolean approved) {
-        isApproved = approved;
     }
 
     @Override
@@ -54,17 +46,13 @@ public class Order {
         Order order = (Order) o;
 
         if (!Objects.equals(orderNumber, order.orderNumber)) return false;
-        if (!Objects.equals(products, order.products)) return false;
-        if (!Objects.equals(isApproved, order.isApproved)) return false;
-        return Objects.equals(client, order.client);
+        return Objects.equals(isApproved, order.isApproved);
     }
 
     @Override
     public int hashCode() {
         int result = orderNumber != null ? orderNumber.hashCode() : 0;
-        result = 31 * result + (products != null ? products.hashCode() : 0);
         result = 31 * result + (isApproved != null ? isApproved.hashCode() : 0);
-        result = 31 * result + (client != null ? client.hashCode() : 0);
         return result;
     }
 
@@ -72,9 +60,7 @@ public class Order {
     public String toString() {
         return "Order{" +
                 "orderNumber=" + orderNumber +
-                ", products=" + products +
                 ", isApproved=" + isApproved +
-                ", client=" + client +
                 '}';
     }
 }

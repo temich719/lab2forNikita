@@ -57,7 +57,7 @@ public class Menu {
 
     private void printOrdersByClientId() throws DAOException {
         System.out.println("Input client id: ");
-        Integer id = scanner.nextInt();
+        Long id = scanner.nextLong();
         OrderDAO orderDAO = DAOFactory.getINSTANCE().getOrderDAO();
         System.out.println("Orders of client with id = " + id);
         System.out.println(orderDAO.getOrdersByClientId(id));

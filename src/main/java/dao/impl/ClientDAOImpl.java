@@ -2,98 +2,68 @@ package dao.impl;
 
 import dao.AbstractDAO;
 import dao.ClientDAO;
-import dao.DAOFactory;
 import exception.DAOException;
 import model.Client;
+import model.Client_;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
 import pool.ConnectionPool;
+import sessionJPA.SessionFactoryCreator;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Root;
 
 public class ClientDAOImpl extends AbstractDAO implements ClientDAO {
 
-    private final Logger LOGGER = LogManager.getLogger(ClientDAOImpl.class);
+    private final SessionFactory sessionFactory = SessionFactoryCreator.getSessionFactory();
 
-    private static final String CREATE_CLIENT = "INSERT INTO clients (name, surname, money) VALUES (?, ?, ?);";
-    private static final String GET_CLIENT_BY_ID = "SELECT * FROM clients WHERE id = ?;";
-    private static final String GET_LAST_CLIENT_ID = "SELECT id FROM clients ORDER BY id DESC LIMIT 1;";
+    private final Logger LOGGER = LogManager.getLogger(ClientDAOImpl.class);
 
     public ClientDAOImpl(ConnectionPool connectionPool) {
         super(connectionPool);
     }
 
     @Override
-    public synchronized Integer createClient(Client client) throws DAOException {
+    public Long createClient(Client client) throws DAOException {
         LOGGER.info("Create user");
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
-        try {
-            connection = connectionPool.provide();
-            connection.setAutoCommit(false);
-            preparedStatement = connection.prepareStatement(CREATE_CLIENT);
-            preparedStatement.setString(1, client.getName());
-            preparedStatement.setString(2, client.getSurname());
-            preparedStatement.setDouble(3, client.getMoney());
-            preparedStatement.executeUpdate();
-            Integer id = getLastId();
-            connection.commit();
-            return id;
-        } catch (SQLException e) {
-            throw new DAOException(e);
-        } finally {
-            close(preparedStatement);
-            connectionPool.retrieve(connection);
+        Transaction transaction = null;
+        try (Session session = sessionFactory.openSession()) {
+            transaction = session.beginTransaction();
+            session.save(client);
+            transaction.commit();
+            return client.getId();
+        } catch (Exception e) {
+            LOGGER.error(e.getMessage());
+            if (transaction != null && transaction.isActive()) {
+                transaction.rollback();
+            }
+            throw new DAOException("Error in DAO method", e);
         }
     }
 
     @Override
-    public synchronized Client getClientById(Integer id) throws DAOException {
+    public Client getClientById(Long id) throws DAOException {
         LOGGER.info("Get user by id");
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
-        try {
-            connection = connectionPool.provide();
-            connection.setAutoCommit(false);
-            preparedStatement = connection.prepareStatement(GET_CLIENT_BY_ID);
-            preparedStatement.setInt(1, id);
-            ResultSet resultSet = preparedStatement.executeQuery();
-            connection.commit();
-            Client client = new Client();
-            resultSet.next();
-            client.setId(resultSet.getInt(1));
-            client.setName(resultSet.getString(2));
-            client.setSurname(resultSet.getString(3));
-            client.setMoney(resultSet.getDouble(4));
+        Transaction transaction = null;
+        try (Session session = sessionFactory.openSession()) {
+            transaction = session.beginTransaction();
+            CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
+            CriteriaQuery<Client> criteriaQuery = criteriaBuilder.createQuery(Client.class);
+            Root<Client> root = criteriaQuery.from(Client.class);
+            criteriaQuery.select(root).where(criteriaBuilder.equal(root.get(Client_.ID), id));
+            Client client = session.createQuery(criteriaQuery).getSingleResult();
+            transaction.commit();
             return client;
-        } catch (SQLException e) {
-            throw new DAOException(e);
-        } finally {
-            close(preparedStatement);
-            connectionPool.retrieve(connection);
-        }
-    }
-
-    private Integer getLastId() throws DAOException {
-        LOGGER.info("Get last client id");
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
-        try {
-            connection = connectionPool.provide();
-            connection.setAutoCommit(false);
-            preparedStatement = connection.prepareStatement(GET_LAST_CLIENT_ID);
-            ResultSet resultSet = preparedStatement.executeQuery();
-            connection.commit();
-            resultSet.next();
-            return resultSet.getInt(1);
-        } catch (SQLException e) {
+        } catch (Exception e) {
+            LOGGER.error(e.getMessage());
+            if (transaction != null && transaction.isActive()) {
+                transaction.rollback();
+            }
             throw new DAOException("Error in DAO method", e);
-        } finally {
-            close(preparedStatement);
-            connectionPool.retrieve(connection);
         }
     }
 }

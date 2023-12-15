@@ -31,14 +31,14 @@ public class Executor {
             Menu menu = new Menu();
             Admin admin = new Admin();
             Client client = menu.startMenu();
-            Integer clientId = clientDAO.createClient(client);
+            Long clientId = clientDAO.createClient(client);
             client.setId(clientId);
             menu.showMenu();
             System.out.println("Input numbers separated with comma: ");
             String input = scanner.nextLine();
-            List<Integer> numbers = parseInput(input);
+            List<Long> numbers = parseInput(input);
             List<Product> productToOrder = new ArrayList<>();
-            for (Integer i : numbers) {
+            for (Long i : numbers) {
                 Product product = productDAO.getProductById(i);
                 product.setId(i);
                 productToOrder.add(product);
@@ -47,7 +47,7 @@ public class Executor {
             order.setProducts(productToOrder);
             order.setClient(client);
             admin.approveOrder(order);
-            Integer orderId = orderDAO.makeOrder(order);
+            Long orderId = orderDAO.makeOrder(order);
             order.setOrderNumber(orderId);
             Bill bill = admin.getBill(order);
             Double remainMoney = client.payBill(bill);
@@ -62,13 +62,13 @@ public class Executor {
         }
     }
 
-    private List<Integer> parseInput(String input) {
-        List<Integer> numbers = new ArrayList<>();
+    private List<Long> parseInput(String input) {
+        List<Long> numbers = new ArrayList<>();
 
         String[] tokens = input.split(",");
         for (String token : tokens) {
             try {
-                int number = Integer.parseInt(token.trim());
+                long number = Long.parseLong(token.trim());
                 numbers.add(number);
             } catch (NumberFormatException e) {
                 System.out.println("Error during converting number: " + token);
